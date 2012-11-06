@@ -9,8 +9,6 @@
 # hostname=grid master name or IP
 # password=guess what goes here
 
-# TODO: detect when the Infoblox API is too old and complain.
-
 use strict;
 use warnings;
 use Config::General;
@@ -21,6 +19,8 @@ use HTTP::Request;
 use Net::IPv4Addr qw( :all ); # EXPORTS NOTHING BY DEFAULT
 use Net::IPv6Addr; # WHY DOES THIS MODULE EXPORT NOTHING AT ALL ARHGAHRGHAGR
 use Net::DNS; # HOW IRONICAL
+
+my $uqdomain = ".uwaterloo.ca"; # set to your own!
 
 my $debug = 0;
 my ($searchName, $searchIP);
@@ -154,7 +154,7 @@ if ($debug > 1){
 if ( my $herp = $ibsession->status_code() ){
 	my $diemsg = "Session failed.\n" . $herp . ": " . $ibsession->status_detail() . "\n";
 	if ($herp == 1009){
-		$diemsg = $diemsg . "Hint: https://nsbuild.uwaterloo.ca/api/dist/CPAN/authors/id/INFOBLOX/\n";
+		$diemsg = $diemsg . "Hint: https://IBXAPPLIANCE/api/dist/CPAN/authors/id/INFOBLOX/\n";
 	}
 	die($diemsg);
 }
@@ -180,8 +180,8 @@ if ( my $ip = ipv4_chkip($toSearch) ){
 	die "Don't know how to do IPv6 addresses\n";
 } else {
 	unless ( $toSearch =~ /\./ ) {
-		if($debug > 1){ print "appending uwaterloo\n"; }
-		$toSearch = $toSearch . ".uwaterloo.ca";
+		if($debug > 1){ print "appending $uqdomain\n"; }
+		$toSearch = $toSearch . $uqdomain;
 	}
 	$searchopts{'name'} = $toSearch;
 	$searchName = $toSearch;
