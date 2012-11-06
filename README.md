@@ -7,6 +7,11 @@ IBContact.pl gets the Business and Technical Contact values from extensible attr
 
 IBDump.pl just gets all the extensible attributes for a given host.
 
+LICENSE
+=======
+
+BSD-new.
+
 TODO
 ====
 
