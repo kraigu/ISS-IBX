@@ -47,14 +47,20 @@ sub pprint() {
 	while(my ($key, $value) = each($eas[0])){
 		# Special case for the Business and Technical Contact fields, which we know may have multi-values
 		if($key eq "Business Contact" || $key eq "Technical Contact"){
+			if($debug > 1){
+				print "Found a $key\n";
+			}
 			if(ref($value) eq 'ARRAY'){
 			 	foreach my $contact (@$value) {
+			 		if($debug > 1){
+			 			print "Contact for $key was $contact\n";
+			 		}
 			 		if($tmpstr) {
 			 			$tmpstr = $tmpstr . "," . $contact;
-			 		} else {
-			 			$tmpstr = $contact;
 			 		}
-				}				
+			 	}				
+			} else {
+				$tmpstr = $value;
 			}
 			print "$key: $tmpstr\n";
 		}
