@@ -11,6 +11,8 @@
 
 use strict;
 use warnings;
+use FindBin;
+use lib "$FindBin::Bin/../lib";
 use Config::General;
 use Data::Dumper;
 use Infoblox;
@@ -19,22 +21,94 @@ use HTTP::Request;
 use Net::IPv4Addr qw( :all ); # EXPORTS NOTHING BY DEFAULT
 use Net::IPv6Addr; # WHY DOES THIS MODULE EXPORT NOTHING AT ALL ARHGAHRGHAGR
 use Net::DNS; # HOW IRONICAL
+use ISSIBX;
+use vars qw/ $opt_i  $opt_v $opt_h $opt_c $opt_f/;
+use Getopt::Std;
+
+getopts('i:v:f:ch');
+if($opt_h){
+    print "Options: -i(Address, network, or hostname), -f(config file), -c(contacts), -v(debug)\n";
+    exit 0;
+}
+my $debug = $opt_v || 0;
 
 my $uqdomain = ".uwaterloo.ca"; # set to your own!
 my $toSearch;
 
-my $debug = 0;
-my ($searchName, $searchIP);
+my ($searchName, $searchIP,%config);
 my $res = Net::DNS::Resolver->new;
 
-my $configfile = '';
-if($debug > 2) {
-	$configfile = qq|$ENV{"HOME"}/.ibtestrc|;
+if($opt_f){
+	%config = ISSIBX::GetConfig($opt_f);
 } else {
-	$configfile = qq|$ENV{"HOME"}/.infobloxrc|;
+	%config = ISSIBX::GetConfig();
 }
 
+
 sub pprint() {
+  if($opt_c){
+  sub buildcontact() {
+	my ($ctype,$tbtc) = @_;
+  # should take two arguments, a string and an array thingie
+	if($debug > 0) {
+		print "buildcontact type $ctype called with a btc\n";
+	}
+  }
+	my $tmpstr = "";
+	my @eas;
+	my $btc;
+	@eas = ($_[0]->extensible_attributes());
+	if (defined($eas[0]{"Pol8-Classification"} ) ){
+		print qq|Classification: $eas[0]{"Pol8-Classification"}\n|;
+	}
+	# Business and Technical Contact can have multiple values
+	if(defined($eas[0]{"Business Contact"})) {
+		$btc = $eas[0]{"Business Contact"};
+		&buildcontact('Business Contact',$btc);
+		 if (ref($btc) eq 'ARRAY') {
+		 	foreach my $contact (@$btc) {
+		 		if($tmpstr) {
+		 			$tmpstr = $tmpstr . "," . $contact;
+		 		} else {
+		 			$tmpstr = $contact;
+		 		}
+			}
+			print "Business Contact: $tmpstr\n";
+		} else {
+			print "Business Contact: $btc\n";
+		}
+	}
+	$btc = undef;
+	if(defined($eas[0]{"Technical Contact"})) {
+		$btc = $eas[0]{"Technical Contact"};
+		if($debug > 0){
+			print "Calling buildcontact('Technical Contact',btc) here\n";
+		}
+		 if (ref($btc) eq 'ARRAY') {
+		 	foreach my $contact (@$btc) {
+		 		if($tmpstr) {
+		 			$tmpstr = $tmpstr . "," . $contact;
+		 		} else {
+		 			$tmpstr = $contact;
+		 		}
+			}
+			print "Technical Contact: $tmpstr\n";
+		} else {
+			print "Technical Contact: $btc\n";
+		}
+	}
+	if(defined($eas[0]{"LEGACY-AdminID"})){
+		print "Legacy Admin: " . $eas[0]{"LEGACY-AdminID"} . "\n";
+	}
+
+	if(defined($eas[0]{"LEGACY-ContactID"})){
+		print "Legacy Contact: " . $eas[0]{"LEGACY-ContactID"} . "\n";
+	}
+
+	if(defined($eas[0]{"LEGACY-User"})){
+		print "Legacy User: " . $eas[0]{"LEGACY-User"} . "\n";
+	}
+}else{
 # This routine is complicated somewhat by the fact that at least a few EAs can have multiple values
 	my $tmpstr = "";
 	my @eas = ($_[0]->extensible_attributes());
@@ -44,7 +118,8 @@ sub pprint() {
 		print "\n-----End of extensible attributes\n";
 	}
 	# $eas[0] should be a hash, innit? So howcome I can't sort the keys? Just dump them out as they came in, for now.
-	while(my ($key, $value) = each($eas[0])){
+	if ($eas[0]){
+	 while(my ($key, $value) = each($eas[0])){
 		# Special case for the Business and Technical Contact fields, which we know may have multi-values
 		if($key eq "Business Contact" || $key eq "Technical Contact"){
 			if($debug > 1){
@@ -57,7 +132,9 @@ sub pprint() {
 			 		}
 			 		if($tmpstr) {
 			 			$tmpstr = $tmpstr . "," . $contact;
-			 		}
+			 		}else{
+		 			      $tmpstr = $contact;
+		 		        }
 			 	}				
 			} else {
 				$tmpstr = $value;
@@ -69,25 +146,11 @@ sub pprint() {
 			print "$key: $value\n";
 		}
 	}
+    }
+   }
 }
 
-die "Address, network, or hostname required\n" unless ($toSearch = $ARGV[0]);
-
-if( ! -e $configfile){ 
-	die "\n$configfile does not exist\n";
-}
-my $perms = sprintf("%o",(stat($configfile))[2] & 07777);
-if($debug > 1){ print Dumper($perms); }
-die "\nConfig file must not have any more than owner rw\n"
-	unless ($perms == '600' || $perms == '0400');
-
-my $conf = new Config::General($configfile);
-my %config = $conf->getall;
-if($debug > 1){ print Dumper(\%config); }
-
-die "\nNo password!\n" unless $config{password};
-die "\nNo hostname!\n" unless $config{hostname};
-die "\nNo username!\n" unless $config{username};
+die "Address, network, or hostname required\n" unless ($toSearch = $opt_i);
 
 # Verify that the remote is responding. This may not be strictly necessary.
 my $timeout = 10;
