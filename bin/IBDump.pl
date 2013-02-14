@@ -150,7 +150,11 @@ sub pprint() {
    }
 }
 
-die "Address, network, or hostname required\n" unless ($toSearch = $opt_i);
+if($#ARGV == 0){
+	$toSearch = $ARGV[0];
+} else {
+	die "Address, network, or hostname required with -i argument\n" unless ($toSearch = $opt_i);
+}
 
 # Verify that the remote is responding. This may not be strictly necessary.
 my $timeout = 10;
