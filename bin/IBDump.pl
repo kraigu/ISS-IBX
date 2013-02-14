@@ -22,12 +22,12 @@ use Net::IPv4Addr qw( :all ); # EXPORTS NOTHING BY DEFAULT
 use Net::IPv6Addr; # WHY DOES THIS MODULE EXPORT NOTHING AT ALL ARHGAHRGHAGR
 use Net::DNS; # HOW IRONICAL
 use ISSIBX;
-use vars qw/ $opt_i  $opt_v $opt_h $opt_c $opt_f/;
+use vars qw/ $opt_i  $opt_v $opt_h $opt_c $opt_b $opt_t $opt_f/;
 use Getopt::Std;
 
-getopts('i:v:f:ch');
+getopts('i:v:f:chbt');
 if($opt_h){
-    print "Options: -i(Address, network, or hostname), -f(config file), -c(contacts), -v(debug)\n";
+    print "Options: -i(Address, network, or hostname), -f(config file), -c(contacts), -b(business contacts), -t(technical contacts) -v(debug)\n";
     exit 0;
 }
 my $debug = $opt_v || 0;
@@ -46,14 +46,28 @@ if($opt_f){
 
 
 sub pprint() {
+     #check if an array has duplicated elements
+     sub uniq2 {
+        my %seen = ();
+        my @r = ();
+        foreach my $a (@_) {
+        unless ($seen{$a}) {
+            push @r, $a;
+            $seen{$a} = 1;
+         }
+       }
+    @r= join( ',', @r );
+    my $s = join('',@r);
+    return $s;
+    }
   if($opt_c){
-  sub buildcontact() {
+       sub buildcontact() {
 	my ($ctype,$tbtc) = @_;
   # should take two arguments, a string and an array thingie
 	if($debug > 0) {
 		print "buildcontact type $ctype called with a btc\n";
 	}
-  }
+       }
 	my $tmpstr = "";
 	my @eas;
 	my $btc;
@@ -108,7 +122,7 @@ sub pprint() {
 	if(defined($eas[0]{"LEGACY-User"})){
 		print "Legacy User: " . $eas[0]{"LEGACY-User"} . "\n";
 	}
-}else{
+}elsif (!$opt_c && !$opt_b && !$opt_t){
 # This routine is complicated somewhat by the fact that at least a few EAs can have multiple values
 	my $tmpstr = "";
 	my @eas = ($_[0]->extensible_attributes());
@@ -147,10 +161,97 @@ sub pprint() {
 		}
 	}
     }
-   }
+ }elsif($opt_b && $opt_t){
+ 	my $tmpstr = "";
+  	my $string ="";
+  	my $btc;
+	my @eas = ($_[0]->extensible_attributes());
+	if ($eas[0]){
+	   	 if(defined($eas[0]{"Business Contact"})) {
+		      $btc = $eas[0]{"Business Contact"};
+		      &buildcontact('Business Contact',$btc);
+		      if (ref($btc) eq 'ARRAY') {
+		 	foreach my $contact (@$btc) {
+		 		if($tmpstr) {
+		 			$tmpstr = $tmpstr . "," . $contact;
+		 		} else {
+		 			$tmpstr = $contact;
+		 		}
+			}
+			  $string = $tmpstr;
+		   } else {
+			  $string = $btc;
+		  }
+	        }
+	        $btc = undef;
+	        if(defined($eas[0]{"Technical Contact"})) {
+		    $btc = $eas[0]{"Technical Contact"};
+		    if($debug > 0){
+			print "Calling buildcontact('Technical Contact',btc) here\n";
+		    }
+		    if (ref($btc) eq 'ARRAY') {
+		 	foreach my $contact (@$btc) {
+		 		if($tmpstr) {
+		 			$tmpstr = $tmpstr . "," . $contact;
+		 		} else {
+		 			$tmpstr = $contact;
+		 		}
+			}
+			$string = $string.",".$tmpstr;
+		    } else {
+			$string = $string.",".$btc;
+		    }
+	      }
+	      if ($string ne ""){
+	      my @str = split(",", $string);
+	      print uniq2(@str)."\n";
+	      } 	
+	   }	
+ }elsif($opt_b || $opt_t){
+  	my $tmpstr = "";
+  	my $string;
+  	my $btc;
+	my @eas = ($_[0]->extensible_attributes());
+	if ($eas[0]){	
+	      while(my ($key, $value) = each($eas[0])){
+	           if ($opt_b && !$opt_t){
+	    	       $string = "Business Contact";}
+	           elsif($opt_t && !$opt_b){
+	    	       $string = "Technical Contact";
+	           }	 
+	    # Special case for the Business and Technical Contact fields, which we know may have multi-values
+	           if($key eq $string && $string ne ""){
+			if($debug > 1){
+				print "Found a $key\n";
+			}
+			if(ref($value) eq 'ARRAY'){
+			 	foreach my $contact (@$value) {
+			 		if($debug > 1){
+			 			print "Contact for $key was $contact\n";
+			 		}
+			 		if($tmpstr) {
+			 			$tmpstr = $tmpstr . "," . $contact;
+			 		}else{
+		 			      $tmpstr = $contact;
+		 		        }
+			 	}				
+			} else {
+				$tmpstr = $value;
+			}
+			print "$tmpstr\n";
+	     }
+	   } 
+	}
+  }	
+ 
+ 
 }
 
-die "Address, network, or hostname required\n" unless ($toSearch = $opt_i);
+if($#ARGV == 0){
+	$toSearch = $ARGV[0];
+} else {
+	die "Address, network, or hostname required with -i argument\n" unless ($toSearch = $opt_i);
+}
 
 # Verify that the remote is responding. This may not be strictly necessary.
 my $timeout = 10;
@@ -240,9 +341,12 @@ if($debug > 1) {
 	print Dumper(@result_array);
 	print "Code: " . $ibsession->status_code() . ":" . $ibsession->status_detail() . "\n\n";
 }
+if((!$opt_b) &&  (!$opt_t)){
 print ("$searchIP $searchName\n");
+}
 if (@result_array) {
 	for my $res (@result_array) {
 		&pprint($res);
 	}
 }
+
