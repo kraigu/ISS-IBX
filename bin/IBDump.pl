@@ -22,12 +22,12 @@ use Net::IPv4Addr qw( :all ); # EXPORTS NOTHING BY DEFAULT
 use Net::IPv6Addr; # WHY DOES THIS MODULE EXPORT NOTHING AT ALL ARHGAHRGHAGR
 use Net::DNS; # HOW IRONICAL
 use ISSIBX;
-use vars qw/ $opt_i  $opt_v $opt_h $opt_c $opt_b $opt_t $opt_f/;
+use vars qw/ $opt_i  $opt_v $opt_h $opt_c $opt_C $opt_b $opt_t $opt_f/;
 use Getopt::Std;
 
-getopts('i:v:f:chbt');
+getopts('i:v:f:cChbt');
 if($opt_h){
-    print "Options: -i(Address, network, or hostname), -f(config file), -c(contacts), -b(business contacts), -t(technical contacts) -v(debug)\n";
+    print "Options: -i(Address, network, or hostname), -f(config file), -c(contacts), -C(IP and hostname),-b(business contacts), -t(technical contacts) -v(debug)\n";
     exit 0;
 }
 my $debug = $opt_v || 0;
@@ -47,19 +47,32 @@ if($opt_f){
 
 sub pprint() {
      #check if an array has duplicated elements
-     sub uniq2 {
+     sub printele {
         my %seen = ();
-        my @r = ();
+        my @a = ();
         foreach my $a (@_) {
-        unless ($seen{$a}) {
-            push @r, $a;
-            $seen{$a} = 1;
+           unless ($seen{$a}) {
+              push @a, $a;
+              $seen{$a} = 1;
          }
        }
-    @r= join( ',', @r );
-    my $s = join('',@r);
+    @a= join( ',', @a );
+    my $s = join('',@a);
     return $s;
     }
+    sub csvoutput {
+        my %seen = ();
+        my @a = ();
+        foreach my $a (@_) {
+           unless ($seen{$a}) {
+              push @a, qq("$a");
+              $seen{$a} = 1;
+         }
+       }
+    @a= join( ',', @a );
+    my $s = join('',@a);
+    return $s;
+    }  
   if($opt_c){
        sub buildcontact() {
 	my ($ctype,$tbtc) = @_;
@@ -68,6 +81,7 @@ sub pprint() {
 		print "buildcontact type $ctype called with a btc\n";
 	}
        }
+        my $string ="";
 	my $tmpstr = "";
 	my @eas;
 	my $btc;
@@ -86,10 +100,22 @@ sub pprint() {
 		 		} else {
 		 			$tmpstr = $contact;
 		 		}
-			}
-			print "Business Contact: $tmpstr\n";
-		} else {
-			print "Business Contact: $btc\n";
+			}    if(!$opt_C){
+			         print "Business Contact: $tmpstr\n";
+			     }
+			     if ($string ne ""){
+			           $string = $string ."," .$tmpstr;
+			     }  else {
+			           $string = $tmpstr;
+			     }
+		} else {     if(!$opt_C){
+			         print "Business Contact: $btc\n";
+			     }
+			     if ($string ne ""){
+		                 $string = $string ."," .$btc;
+	                     }  else {
+		                 $string = $btc;
+	                     }
 		}
 	}
 	$btc = undef;
@@ -105,23 +131,64 @@ sub pprint() {
 		 		} else {
 		 			$tmpstr = $contact;
 		 		}
-			}
-			print "Technical Contact: $tmpstr\n";
-		} else {
-			print "Technical Contact: $btc\n";
+			}    if(!$opt_C){		
+			         print "Technical Contact: $tmpstr\n";
+			     }
+			     if ($string ne ""){
+			           $string = $string ."," .$tmpstr
+			     }  else {
+			           $string = $tmpstr;
+			     }  
+		} else {     if(!$opt_C){
+			         print "Technical Contact: $btc\n";
+			     }
+			     if ($string ne ""){
+		                 $string = $string ."," .$btc;
+	                     }  else {
+		                 $string = $btc;
+	                     }
 		}
 	}
 	if(defined($eas[0]{"LEGACY-AdminID"})){
-		print "Legacy Admin: " . $eas[0]{"LEGACY-AdminID"} . "\n";
+		if(!$opt_C){
+		    print "Legacy Admin: " . $eas[0]{"LEGACY-AdminID"} . "\n";
+		}
+		if ($string ne ""){
+		   $string = $string."," .$eas[0]{"LEGACY-AdminID"};
+	        }else{
+	           $string = $eas[0]{"LEGACY-AdminID"};
+	        }
 	}
 
 	if(defined($eas[0]{"LEGACY-ContactID"})){
-		print "Legacy Contact: " . $eas[0]{"LEGACY-ContactID"} . "\n";
+		if(!$opt_C){
+		    print "Legacy Contact: " . $eas[0]{"LEGACY-ContactID"} . "\n";
+	        }
+		if ($string ne ""){
+		   $string = $string."," .$eas[0]{"LEGACY-ContactID"};
+	        }else{
+	           $string = $eas[0]{"LEGACY-ContactID"};
+	        }
 	}
 
 	if(defined($eas[0]{"LEGACY-User"})){
-		print "Legacy User: " . $eas[0]{"LEGACY-User"} . "\n";
+		if(!$opt_C){ 
+		    print "Legacy User: " . $eas[0]{"LEGACY-User"} . "\n";
+		}
+		if ($string ne ""){
+		   $string = $string."," .$eas[0]{"LEGACY-User"};
+	        }else{
+	           $string = $eas[0]{"LEGACY-User"};
+	        }
 	}
+	if ($string ne ""){
+	         my @str = split(",", $string);
+	         if($opt_C){
+	               print csvoutput(@str)."\n";
+	         }
+        }else{   
+                 print "\n";	
+        }
 }elsif (!$opt_c && !$opt_b && !$opt_t){
 # This routine is complicated somewhat by the fact that at least a few EAs can have multiple values
 	my $tmpstr = "";
@@ -160,7 +227,7 @@ sub pprint() {
 			print "$key: $value\n";
 		}
 	}
-    }
+     }
  }elsif($opt_b && $opt_t){
  	my $tmpstr = "";
   	my $string ="";
@@ -203,9 +270,16 @@ sub pprint() {
 		    }
 	      }
 	      if ($string ne ""){
-	      my @str = split(",", $string);
-	      print uniq2(@str)."\n";
-	      } 	
+	         my @str = split(",", $string);
+	         if($opt_C){
+	               print qq("$searchIP","$searchName",);
+	               print csvoutput(@str)."\n";
+	         }else{
+	      	       print printele(@str)."\n";
+	         }
+	     }else{
+	     	print "\n";
+	     }	
 	   }	
  }elsif($opt_b || $opt_t){
   	my $tmpstr = "";
@@ -238,13 +312,22 @@ sub pprint() {
 			} else {
 				$tmpstr = $value;
 			}
-			print "$tmpstr\n";
+			#print "$tmpstr\n";
+                        if ($tmpstr ne ""){
+	                    my @st = split(",", $tmpstr);
+	                    if($opt_C){
+	                        print csvoutput(@st)."\n";
+	                    }else{
+	      	                print printele(@st)."\n";
+	                    }
+	                }	
 	     }
-	   } 
+	   }
 	}
-  }	
- 
- 
+	if($tmpstr eq "" && $opt_C){
+	   	print "\n";
+	 }
+  }	   
 }
 
 if($#ARGV == 0){
@@ -341,12 +424,18 @@ if($debug > 1) {
 	print Dumper(@result_array);
 	print "Code: " . $ibsession->status_code() . ":" . $ibsession->status_detail() . "\n\n";
 }
-if((!$opt_b) &&  (!$opt_t)){
-print ("$searchIP $searchName\n");
+
+if(!$opt_C && !$opt_b && !$opt_t){
+print $searchIP.",".$searchName."\n";
 }
+elsif($opt_C){
+print qq("$searchIP","$searchName",);
+}
+
 if (@result_array) {
 	for my $res (@result_array) {
 		&pprint($res);
 	}
+}elsif(!@result_array && $opt_C){
+	print "\n";
 }
-
