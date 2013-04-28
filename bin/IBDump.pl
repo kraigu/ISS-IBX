@@ -372,7 +372,7 @@ if ($debug > 1){
 if ( my $herp = $ibsession->status_code() ){
 	my $diemsg = "Session failed.\n" . $herp . ": " . $ibsession->status_detail() . "\n";
 	if ($herp == 1009){
-		$diemsg = $diemsg . "Hint: https://IBXAPPLIANCE/api/dist/CPAN/authors/id/INFOBLOX/\n";
+		$diemsg = $diemsg . "Hint: https://$config{hostname}/api/dist/CPAN/authors/id/INFOBLOX/\n";
 	}
 	die($diemsg);
 }
