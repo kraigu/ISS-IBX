@@ -11,6 +11,7 @@
 
 use strict;
 use warnings;
+use IO::Socket::SSL;
 use FindBin;
 use lib "$FindBin::Bin/../lib";
 use Config::General;
@@ -86,8 +87,8 @@ sub pprint() {
 	my @eas;
 	my $btc;
 	@eas = ($_[0]->extensible_attributes());
-	if (defined($eas[0]{"Pol8-Classification"} ) ){
-		print qq|Classification: $eas[0]{"Pol8-Classification"}\n|;
+	if (defined($eas[0]{"Pol8 Classification"} ) ){
+		print qq|Classification: $eas[0]{"Pol8 Classification"}\n|;
 	}
 	# Business and Technical Contact can have multiple values
 	if(defined($eas[0]{"Business Contact"})) {
@@ -438,4 +439,11 @@ if (@result_array) {
 	}
 }elsif(!@result_array && $opt_C){
 	print "\n";
+}
+
+# OK, so, yeah, we hate security and stuff.
+BEGIN {
+    IO::Socket::SSL::set_defaults(
+        verify_mode => Net::SSLeay->VERIFY_NONE(),
+    );
 }
