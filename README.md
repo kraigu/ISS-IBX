@@ -3,16 +3,11 @@ ISS-IBX
 
 Waterloo ISS tools to talk to an Infoblox appliance.
 
-IBContact.pl gets the Business and Technical Contact values from extensible attributes for a given host.
+IBDump.pl gets all the extensible attributes for a given host and has options to dump just particular ones.
 
-IBDump.pl just gets all the extensible attributes for a given host.
+IB-AllEAs.pl prints just a few extensible attributes in a different format. It's probably mis-named, at least for its present function.
 
 LICENSE
 =======
 
 BSD-new.
-
-TODO
-====
-
-Proper programmating techniques like use a library instead of copypasta code.
