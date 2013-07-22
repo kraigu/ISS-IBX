@@ -23,12 +23,22 @@ use Net::IPv4Addr qw( :all ); # EXPORTS NOTHING BY DEFAULT
 use Net::IPv6Addr; # WHY DOES THIS MODULE EXPORT NOTHING AT ALL ARHGAHRGHAGR
 use Net::DNS; # HOW IRONICAL
 use ISSIBX;
-use vars qw/ $opt_i  $opt_v $opt_h $opt_c $opt_C $opt_b $opt_t $opt_f/;
+use vars qw/$opt_i $opt_v $opt_h $opt_c $opt_C $opt_b $opt_t $opt_f $opt_m/;
 use Getopt::Std;
 
-getopts('i:v:f:cChbt');
+getopts('i:v:f:cChbtm');
 if($opt_h){
-    print "Options: -i(Address, network, or hostname), -f(config file), -c(contacts), -C(IP and hostname),-b(business contacts), -t(technical contacts) -v(debug)\n";
+    print qq|
+Options:
+-i (required, or if one argument this is assumed) IP address, network, or hostname
+-f config file
+-c print all contacts
+-C IP and hostname
+-b print only business contacts
+-t print only technical contacts
+-m look up MAC address too
+-v Verbose/debug
+|;
     exit 0;
 }
 my $debug = $opt_v || 0;
@@ -45,78 +55,80 @@ if($opt_f){
 	%config = ISSIBX::GetConfig();
 }
 
-
 sub pprint() {
-     #check if an array has duplicated elements
-     sub printele {
-        my %seen = ();
-        my @a = ();
-        foreach my $a (@_) {
-           unless ($seen{$a}) {
-              push @a, $a;
-              $seen{$a} = 1;
-         }
-       }
-    @a= join( ',', @a );
-    my $s = join('',@a);
-    return $s;
-    }
+	#check if an array has duplicated elements
+    sub printele {
+		my %seen = ();
+		my @a = ();
+		foreach my $a (@_) {
+			unless ($seen{$a}) {
+				push @a, $a;
+				$seen{$a} = 1;
+			}
+		}
+		@a= join( ',', @a );
+		my $s = join('',@a);
+    	return $s;
+	}
     sub csvoutput {
-        my %seen = ();
-        my @a = ();
+		my %seen = ();
+ 		my @a = ();
         foreach my $a (@_) {
            unless ($seen{$a}) {
               push @a, qq("$a");
               $seen{$a} = 1;
-         }
-       }
-    @a= join( ',', @a );
-    my $s = join('',@a);
-    return $s;
-    }  
-  if($opt_c){
-       sub buildcontact() {
-	my ($ctype,$tbtc) = @_;
-  # should take two arguments, a string and an array thingie
-	if($debug > 0) {
-		print "buildcontact type $ctype called with a btc\n";
-	}
-       }
+			}
+		}
+		@a= join( ',', @a );
+		my $s = join('',@a);
+		return $s;
+	}  
+
+	if($opt_c){
+		sub buildcontact() {
+			my ($ctype,$tbtc) = @_;
+		# should take two arguments, a string and an array thingie
+			if($debug > 0) {
+				print "buildcontact type $ctype called with a btc\n";
+			}
+		}
         my $string ="";
-	my $tmpstr = "";
-	my @eas;
-	my $btc;
-	@eas = ($_[0]->extensible_attributes());
-	if (defined($eas[0]{"Pol8 Classification"} ) ){
-		print qq|Classification: $eas[0]{"Pol8 Classification"}\n|;
-	}
-	# Business and Technical Contact can have multiple values
-	if(defined($eas[0]{"Business Contact"})) {
-		$btc = $eas[0]{"Business Contact"};
-		&buildcontact('Business Contact',$btc);
-		 if (ref($btc) eq 'ARRAY') {
-		 	foreach my $contact (@$btc) {
-		 		if($tmpstr) {
-		 			$tmpstr = $tmpstr . "," . $contact;
-		 		} else {
-		 			$tmpstr = $contact;
-		 		}
-			}    if(!$opt_C){
-			         print "Business Contact: $tmpstr\n";
-			     }
-			     if ($string ne ""){
-			           $string = $string ."," .$tmpstr;
-			     }  else {
-			           $string = $tmpstr;
-			     }
-		} else {     if(!$opt_C){
-			         print "Business Contact: $btc\n";
-			     }
-			     if ($string ne ""){
-		                 $string = $string ."," .$btc;
-	                     }  else {
-		                 $string = $btc;
-	                     }
+		my $tmpstr = "";
+		my @eas;
+		my $btc;
+		@eas = ($_[0]->extensible_attributes());
+		if (defined($eas[0]{"Pol8 Classification"} ) ){
+			print qq|Classification: $eas[0]{"Pol8 Classification"}\n|;
+		}
+		# Business and Technical Contact can have multiple values
+		if(defined($eas[0]{"Business Contact"})) {
+			$btc = $eas[0]{"Business Contact"};
+			&buildcontact('Business Contact',$btc);
+		 	if (ref($btc) eq 'ARRAY') {
+		 		foreach my $contact (@$btc) {
+		 			if($tmpstr) {
+		 				$tmpstr = $tmpstr . "," . $contact;
+		 			} else {
+		 				$tmpstr = $contact;
+		 			}
+				}
+				if(!$opt_C){
+					print "Business Contact: $tmpstr\n";
+				}
+			    if ($string ne ""){
+					$string = $string ."," .$tmpstr;
+				} else {
+					$string = $tmpstr;
+				}
+			} else {
+				if(!$opt_C){
+					print "Business Contact: $btc\n";
+				}
+			if ($string ne ""){
+				$string = $string ."," .$btc;
+			} else {
+				$string = $btc;
+			}
 		}
 	}
 	$btc = undef;
@@ -127,8 +139,8 @@ sub pprint() {
 		}
 		 if (ref($btc) eq 'ARRAY') {
 		 	foreach my $contact (@$btc) {
-		 		if($tmpstr) {
-		 			$tmpstr = $tmpstr . "," . $contact;
+				if($tmpstr) {
+					$tmpstr = $tmpstr . "," . $contact;
 		 		} else {
 		 			$tmpstr = $contact;
 		 		}
@@ -334,7 +346,7 @@ sub pprint() {
 if($#ARGV == 0){
 	$toSearch = $ARGV[0];
 } else {
-	die "Address, network, or hostname required with -i argument\n" unless ($toSearch = $opt_i);
+	die "Address, network, or hostname required\n" unless ($toSearch = $opt_i);
 }
 
 # Verify that the remote is responding. This may not be strictly necessary.
@@ -352,7 +364,7 @@ eval {
 	}
 };
 
-if ($@) {
+if($@){
 	if($debug > 0){
 		print "Dumping something:\n" . Dumper($@) . "Dumped something\n";
 	}
@@ -427,17 +439,16 @@ if($debug > 1) {
 }
 
 if(!$opt_C && !$opt_b && !$opt_t){
-print $searchIP.",".$searchName."\n";
-}
-elsif($opt_C){
-print qq("$searchIP","$searchName",);
+	print $searchIP.",".$searchName."\n";
+} elsif($opt_C){
+	print qq("$searchIP","$searchName",);
 }
 
 if (@result_array) {
 	for my $res (@result_array) {
 		&pprint($res);
 	}
-}elsif(!@result_array && $opt_C){
+} elsif(!@result_array && $opt_C) {
 	print "\n";
 }
 
