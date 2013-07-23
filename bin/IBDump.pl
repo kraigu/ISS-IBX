@@ -3,11 +3,7 @@
 # Dump all Infoblox Extensible Attributes from Waterloo IPAM system
 # Mike Patterson <mike.patterson@uwaterloo.ca> May 2012
 # based on ibtest.pl developed by same, w/ thanks to drallen@uwaterloo.ca and Geoff Horne
-
-# Expects $HOME/.infobloxrc to exist, to be mode 0600, and to contain:
-# username=your username
-# hostname=grid master name or IP
-# password=guess what goes here
+# with contributions from Cheng Ji Shi <cjshi@uwaterloo.ca> Winter 2013 co-op
 
 use strict;
 use warnings;
@@ -43,7 +39,6 @@ Options:
 }
 my $debug = $opt_v || 0;
 
-my $uqdomain = ".uwaterloo.ca"; # set to your own!
 my $toSearch;
 
 my ($searchName, $searchIP,%config);
@@ -297,49 +292,48 @@ sub pprint() {
  }elsif($opt_b || $opt_t){
   	my $tmpstr = "";
   	my $string;
-  	my $btc;
+	my $btc;
 	my @eas = ($_[0]->extensible_attributes());
 	if ($eas[0]){	
-	      while(my ($key, $value) = each($eas[0])){
-	           if ($opt_b && !$opt_t){
-	    	       $string = "Business Contact";}
-	           elsif($opt_t && !$opt_b){
-	    	       $string = "Technical Contact";
-	           }	 
-	    # Special case for the Business and Technical Contact fields, which we know may have multi-values
-	           if($key eq $string && $string ne ""){
-			if($debug > 1){
-				print "Found a $key\n";
-			}
-			if(ref($value) eq 'ARRAY'){
-			 	foreach my $contact (@$value) {
-			 		if($debug > 1){
-			 			print "Contact for $key was $contact\n";
-			 		}
-			 		if($tmpstr) {
-			 			$tmpstr = $tmpstr . "," . $contact;
-			 		}else{
-		 			      $tmpstr = $contact;
+		while(my ($key, $value) = each($eas[0])){
+			if ($opt_b && !$opt_t){
+				$string = "Business Contact";}
+			elsif($opt_t && !$opt_b){
+				$string = "Technical Contact";
+			} 
+	    	# Special case for the Business and Technical Contact fields, which we know may have multi-values
+			if($key eq $string && $string ne ""){
+				if($debug > 1){
+					print "Found a $key\n";
+				}
+				if(ref($value) eq 'ARRAY'){
+			 		foreach my $contact (@$value) {
+			 			if($debug > 1){
+			 				print "Contact for $key was $contact\n";
+			 			}
+			 			if($tmpstr) {
+			 				$tmpstr = $tmpstr . "," . $contact;
+			 			} else {
+							$tmpstr = $contact;
 		 		        }
-			 	}				
-			} else {
-				$tmpstr = $value;
+				 	}				
+				} else {
+					$tmpstr = $value;
+				}
+				if ($tmpstr ne ""){
+					my @st = split(",", $tmpstr);
+					if($opt_C){
+						print csvoutput(@st)."\n";
+					} else {
+						print printele(@st)."\n";
+					}
+				}	
 			}
-			#print "$tmpstr\n";
-                        if ($tmpstr ne ""){
-	                    my @st = split(",", $tmpstr);
-	                    if($opt_C){
-	                        print csvoutput(@st)."\n";
-	                    }else{
-	      	                print printele(@st)."\n";
-	                    }
-	                }	
-	     }
-	   }
+		}
 	}
 	if($tmpstr eq "" && $opt_C){
 	   	print "\n";
-	 }
+	}
   }	   
 }
 
@@ -348,6 +342,8 @@ if($#ARGV == 0){
 } else {
 	die "Address, network, or hostname required\n" unless ($toSearch = $opt_i);
 }
+
+my $uqdomain = "." . $config{uqdomain};
 
 # Verify that the remote is responding. This may not be strictly necessary.
 my $timeout = 10;
