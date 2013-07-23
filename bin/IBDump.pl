@@ -19,17 +19,16 @@ use Net::IPv4Addr qw( :all ); # EXPORTS NOTHING BY DEFAULT
 use Net::IPv6Addr; # WHY DOES THIS MODULE EXPORT NOTHING AT ALL ARHGAHRGHAGR
 use Net::DNS; # HOW IRONICAL
 use ISSIBX;
-use vars qw/$opt_i $opt_v $opt_h $opt_c $opt_C $opt_b $opt_t $opt_f $opt_m/;
+use vars qw/$opt_i $opt_v $opt_h $opt_c $opt_b $opt_t $opt_f $opt_m/;
 use Getopt::Std;
 
-getopts('i:v:f:cChbtm');
+getopts('i:v:f:chbtm');
 if($opt_h){
     print qq|
 Options:
 -i (required, or if one argument this is assumed) IP address, network, or hostname
 -f config file
 -c print all contacts
--C IP and hostname
 -b print only business contacts
 -t print only technical contacts
 -m look up MAC address too
@@ -50,43 +49,34 @@ if($opt_f){
 	%config = ISSIBX::GetConfig();
 }
 
-sub pprint() {
-	#check if an array has duplicated elements
-    sub printele {
-		my %seen = ();
-		my @a = ();
-		foreach my $a (@_) {
-			unless ($seen{$a}) {
-				push @a, $a;
-				$seen{$a} = 1;
-			}
-		}
-		@a= join( ',', @a );
-		my $s = join('',@a);
-    	return $s;
-	}
-    sub csvoutput {
-		my %seen = ();
- 		my @a = ();
-        foreach my $a (@_) {
-           unless ($seen{$a}) {
-              push @a, qq("$a");
-              $seen{$a} = 1;
-			}
-		}
-		@a= join( ',', @a );
-		my $s = join('',@a);
-		return $s;
-	}  
+my ($btc);
 
-	if($opt_c){
-		sub buildcontact() {
-			my ($ctype,$tbtc) = @_;
-		# should take two arguments, a string and an array thingie
-			if($debug > 0) {
-				print "buildcontact type $ctype called with a btc\n";
-			}
+sub printele {
+	my %seen = ();
+	my @a = ();
+	foreach my $a (@_) {
+		unless ($seen{$a}) {
+			push @a, $a;
+			$seen{$a} = 1;
 		}
+	}
+	@a= join( ',', @a );
+	my $s = join('',@a);
+	return $s;
+}
+
+
+sub buildcontact() {
+	my ($ctype,$tbtc) = @_;
+	# should take two arguments, a string and an array thingie
+	if($debug > 0) {
+		print "buildcontact type $ctype called with a btc\n";
+	}
+}
+
+
+sub pprint() {
+	if($opt_c){
         my $string ="";
 		my $tmpstr = "";
 		my @eas;
@@ -99,34 +89,32 @@ sub pprint() {
 		if(defined($eas[0]{"Business Contact"})) {
 			$btc = $eas[0]{"Business Contact"};
 			&buildcontact('Business Contact',$btc);
-		 	if (ref($btc) eq 'ARRAY') {
-		 		foreach my $contact (@$btc) {
-		 			if($tmpstr) {
-		 				$tmpstr = $tmpstr . "," . $contact;
-		 			} else {
-		 				$tmpstr = $contact;
+			if (ref($btc) eq 'ARRAY') {
+				foreach my $contact (@$btc) {
+					if($tmpstr) {
+						$tmpstr = $tmpstr . "," . $contact;
+					} else {
+						$tmpstr = $contact;
 		 			}
 				}
-				if(!$opt_C){
-					print "Business Contact: $tmpstr\n";
-				}
-			    if ($string ne ""){
+				print "Business Contact: $tmpstr\n";
+				if ($string ne ""){
 					$string = $string ."," .$tmpstr;
 				} else {
 					$string = $tmpstr;
 				}
 			} else {
-				if(!$opt_C){
 					print "Business Contact: $btc\n";
-				}
+			}
 			if ($string ne ""){
 				$string = $string ."," .$btc;
 			} else {
 				$string = $btc;
 			}
 		}
+	} else {
+		$btc = undef;
 	}
-	$btc = undef;
 	if(defined($eas[0]{"Technical Contact"})) {
 		$btc = $eas[0]{"Technical Contact"};
 		if($debug > 0){
@@ -139,9 +127,7 @@ sub pprint() {
 		 		} else {
 		 			$tmpstr = $contact;
 		 		}
-			}    if(!$opt_C){		
-			         print "Technical Contact: $tmpstr\n";
-			     }
+			}
 			     if ($string ne ""){
 			           $string = $string ."," .$tmpstr
 			     }  else {
@@ -191,13 +177,10 @@ sub pprint() {
 	}
 	if ($string ne ""){
 	         my @str = split(",", $string);
-	         if($opt_C){
-	               print csvoutput(@str)."\n";
-	         }
-        }else{   
-                 print "\n";	
-        }
-}elsif (!$opt_c && !$opt_b && !$opt_t){
+	} else{
+		print "\n";	
+	}
+} elsif (!$opt_c && !$opt_b && !$opt_t){
 # This routine is complicated somewhat by the fact that at least a few EAs can have multiple values
 	my $tmpstr = "";
 	my @eas = ($_[0]->extensible_attributes());
@@ -277,18 +260,12 @@ sub pprint() {
 			$string = $string.",".$btc;
 		    }
 	      }
-	      if ($string ne ""){
-	         my @str = split(",", $string);
-	         if($opt_C){
-	               print qq("$searchIP","$searchName",);
-	               print csvoutput(@str)."\n";
-	         }else{
-	      	       print printele(@str)."\n";
-	         }
-	     }else{
-	     	print "\n";
-	     }	
-	   }	
+		if ($string ne ""){
+			my @str = split(",", $string);
+			print printele(@str)."\n";
+		} else{
+			print "\n";
+		}
  }elsif($opt_b || $opt_t){
   	my $tmpstr = "";
   	my $string;
@@ -321,18 +298,10 @@ sub pprint() {
 					$tmpstr = $value;
 				}
 				if ($tmpstr ne ""){
-					my @st = split(",", $tmpstr);
-					if($opt_C){
-						print csvoutput(@st)."\n";
-					} else {
-						print printele(@st)."\n";
-					}
+					print printele(@st)."\n";
 				}	
 			}
 		}
-	}
-	if($tmpstr eq "" && $opt_C){
-	   	print "\n";
 	}
   }	   
 }
@@ -434,10 +403,8 @@ if($debug > 1) {
 	print "Code: " . $ibsession->status_code() . ":" . $ibsession->status_detail() . "\n\n";
 }
 
-if(!$opt_C && !$opt_b && !$opt_t){
-	print $searchIP.",".$searchName."\n";
-} elsif($opt_C){
-	print qq("$searchIP","$searchName",);
+if(!$opt_b && !$opt_t){
+	print qq|$searchIP $searchName\n|;
 }
 
 if (@result_array) {
