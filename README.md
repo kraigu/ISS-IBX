@@ -12,10 +12,10 @@ Configuration File
 
 Goes in ~/.infobloxrc and must be mode 0600.
 
-username=(infoblox username with API access)
-hostname=(infoblox device)
-password=(guess)
-uqdomain=(the domain name to use in certain unqualified queries)
+	username=(infoblox username with API access)
+	hostname=(infoblox device)
+	password=(guess)
+	uqdomain=(the domain name to use in certain unqualified queries)
 
 LICENSE
 =======
