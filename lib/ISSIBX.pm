@@ -30,7 +30,6 @@ sub GetConfig{
 	die "\nNo password!\n" unless $config{password};
 	die "\nNo hostname!\n" unless $config{hostname};
 	die "\nNo username!\n" unless $config{username};
-	die "\nNo unqualified domain!\n" unless $config{uqdomain};
 	return %config;
 }
 
