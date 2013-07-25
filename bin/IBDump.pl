@@ -73,13 +73,13 @@ sub buildcontact {
 }
 
 sub pprint {
+	my $string ="";
+	my $tmpstr = "";
+	my @eas;
+	my $btc;
+	@eas = ($_[0]->extensible_attributes());
 	if($opt_c){
-        my $string ="";
-		my $tmpstr = "";
-		my @eas;
-		my $btc;
-		@eas = ($_[0]->extensible_attributes());
-		if (defined($eas[0]{"Pol8 Classification"} ) ){
+ 		if (defined($eas[0]{"Pol8 Classification"} ) ){
 			print qq|Classification: $eas[0]{"Pol8 Classification"}\n|;
 		}
 		# Business and Technical Contact can have multiple values
@@ -169,8 +169,6 @@ sub pprint {
 	         print "\n";
 }elsif (!$opt_c && !$opt_b && !$opt_t){
 # This routine is complicated somewhat by the fact that at least a few EAs can have multiple values
-	my $tmpstr = "";
-	my @eas = ($_[0]->extensible_attributes());
 	if($debug > 0){
 		print "----\nAll extensible attributes:\n";
 		print Dumper($eas[0]);
@@ -207,10 +205,6 @@ sub pprint {
 	}
      }
  }elsif($opt_b && $opt_t){
- 	my $tmpstr = "";
-  	my $string ="";
-  	my $btc;
-	my @eas = ($_[0]->extensible_attributes());
 	if ($eas[0]){
 	   	 if(defined($eas[0]{"Business Contact"})) {
 		      $btc = $eas[0]{"Business Contact"};
@@ -255,10 +249,6 @@ sub pprint {
 	     }	
 	   }	
  }elsif($opt_b || $opt_t){
-  	my $tmpstr = "";
-  	my $string;
-	my $btc;
-	my @eas = ($_[0]->extensible_attributes());
 	if ($eas[0]){	
 		while(my ($key, $value) = each($eas[0])){
 			if ($opt_b && !$opt_t){
