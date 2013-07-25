@@ -3,11 +3,7 @@
 # Dump all Infoblox Extensible Attributes from Waterloo IPAM system
 # Mike Patterson <mike.patterson@uwaterloo.ca> May 2012
 # based on ibtest.pl developed by same, w/ thanks to drallen@uwaterloo.ca and Geoff Horne
-
-# Expects $HOME/.infobloxrc to exist, to be mode 0600, and to contain:
-# username=your username
-# hostname=grid master name or IP
-# password=guess what goes here
+# with contributions from Cheng Ji Shi <cjshi@uwaterloo.ca> Winter 2013 co-op
 
 use strict;
 use warnings;
@@ -23,17 +19,25 @@ use Net::IPv4Addr qw( :all ); # EXPORTS NOTHING BY DEFAULT
 use Net::IPv6Addr; # WHY DOES THIS MODULE EXPORT NOTHING AT ALL ARHGAHRGHAGR
 use Net::DNS; # HOW IRONICAL
 use ISSIBX;
-use vars qw/ $opt_i  $opt_v $opt_h $opt_c $opt_C $opt_b $opt_t $opt_f/;
+use vars qw/$opt_i $opt_v $opt_h $opt_c $opt_b $opt_t $opt_f $opt_m/;
 use Getopt::Std;
 
-getopts('i:v:f:cChbt');
+getopts('i:v:f:chbtm');
 if($opt_h){
-    print "Options: -i(Address, network, or hostname), -f(config file), -c(contacts), -C(IP and hostname),-b(business contacts), -t(technical contacts) -v(debug)\n";
+    print qq|
+Options:
+-i (required, or if one argument this is assumed) IP address, network, or hostname
+-f config file
+-c print all contacts
+-b print only business contacts
+-t print only technical contacts
+-m look up MAC address too
+-v Verbose/debug
+|;
     exit 0;
 }
 my $debug = $opt_v || 0;
 
-my $uqdomain = ".uwaterloo.ca"; # set to your own!
 my $toSearch;
 
 my ($searchName, $searchIP,%config);
@@ -45,80 +49,66 @@ if($opt_f){
 	%config = ISSIBX::GetConfig();
 }
 
+sub printele {
+#check if an array has duplicated elements
+	my %seen = ();
+	my @a = ();
+	foreach my $a (@_) {
+		unless ($seen{$a}) {
+			push @a, $a;
+			$seen{$a} = 1;
+		}
+	}
+	@a= join( ',', @a );
+	my $s = join('',@a);
+	return $s;
+}
 
-sub pprint() {
-     #check if an array has duplicated elements
-     sub printele {
-        my %seen = ();
-        my @a = ();
-        foreach my $a (@_) {
-           unless ($seen{$a}) {
-              push @a, $a;
-              $seen{$a} = 1;
-         }
-       }
-    @a= join( ',', @a );
-    my $s = join('',@a);
-    return $s;
-    }
-    sub csvoutput {
-        my %seen = ();
-        my @a = ();
-        foreach my $a (@_) {
-           unless ($seen{$a}) {
-              push @a, qq("$a");
-              $seen{$a} = 1;
-         }
-       }
-    @a= join( ',', @a );
-    my $s = join('',@a);
-    return $s;
-    }  
-  if($opt_c){
-       sub buildcontact() {
+sub buildcontact {
+# should take two arguments, a string and an array thingie
 	my ($ctype,$tbtc) = @_;
-  # should take two arguments, a string and an array thingie
 	if($debug > 0) {
 		print "buildcontact type $ctype called with a btc\n";
 	}
-       }
+}
+
+sub pprint {
+	if($opt_c){
         my $string ="";
-	my $tmpstr = "";
-	my @eas;
-	my $btc;
-	@eas = ($_[0]->extensible_attributes());
-	if (defined($eas[0]{"Pol8 Classification"} ) ){
-		print qq|Classification: $eas[0]{"Pol8 Classification"}\n|;
-	}
-	# Business and Technical Contact can have multiple values
-	if(defined($eas[0]{"Business Contact"})) {
-		$btc = $eas[0]{"Business Contact"};
-		&buildcontact('Business Contact',$btc);
-		 if (ref($btc) eq 'ARRAY') {
-		 	foreach my $contact (@$btc) {
-		 		if($tmpstr) {
-		 			$tmpstr = $tmpstr . "," . $contact;
-		 		} else {
-		 			$tmpstr = $contact;
-		 		}
-			}    if(!$opt_C){
-			         print "Business Contact: $tmpstr\n";
-			     }
-			     if ($string ne ""){
-			           $string = $string ."," .$tmpstr;
-			     }  else {
-			           $string = $tmpstr;
-			     }
-		} else {     if(!$opt_C){
-			         print "Business Contact: $btc\n";
-			     }
-			     if ($string ne ""){
-		                 $string = $string ."," .$btc;
-	                     }  else {
-		                 $string = $btc;
-	                     }
+		my $tmpstr = "";
+		my @eas;
+		my $btc;
+		@eas = ($_[0]->extensible_attributes());
+		if (defined($eas[0]{"Pol8 Classification"} ) ){
+			print qq|Classification: $eas[0]{"Pol8 Classification"}\n|;
 		}
-	}
+		# Business and Technical Contact can have multiple values
+		if(defined($eas[0]{"Business Contact"})) {
+			$btc = $eas[0]{"Business Contact"};
+			&buildcontact('Business Contact',$btc);
+		 	if (ref($btc) eq 'ARRAY') {
+		 		foreach my $contact (@$btc) {
+		 			if($tmpstr) {
+		 				$tmpstr = $tmpstr . "," . $contact;
+		 			} else {
+		 				$tmpstr = $contact;
+		 			}
+				}
+				print "Business Contact: $tmpstr\n";
+			    if ($string ne ""){
+					$string = $string ."," .$tmpstr;
+				} else {
+					$string = $tmpstr;
+				}
+			} else {
+				print "Business Contact: $btc\n";
+				if ($string ne ""){
+					$string = $string ."," .$btc;
+				} else {
+					$string = $btc;
+				}
+			}
+		}
 	$btc = undef;
 	if(defined($eas[0]{"Technical Contact"})) {
 		$btc = $eas[0]{"Technical Contact"};
@@ -127,22 +117,20 @@ sub pprint() {
 		}
 		 if (ref($btc) eq 'ARRAY') {
 		 	foreach my $contact (@$btc) {
-		 		if($tmpstr) {
-		 			$tmpstr = $tmpstr . "," . $contact;
+				if($tmpstr) {
+					$tmpstr = $tmpstr . "," . $contact;
 		 		} else {
 		 			$tmpstr = $contact;
 		 		}
-			}    if(!$opt_C){		
-			         print "Technical Contact: $tmpstr\n";
-			     }
+			}		
+		         print "Technical Contact: $tmpstr\n";
 			     if ($string ne ""){
 			           $string = $string ."," .$tmpstr
 			     }  else {
 			           $string = $tmpstr;
 			     }  
-		} else {     if(!$opt_C){
-			         print "Technical Contact: $btc\n";
-			     }
+		} else {     
+		         print "Technical Contact: $btc\n";
 			     if ($string ne ""){
 		                 $string = $string ."," .$btc;
 	                     }  else {
@@ -151,9 +139,7 @@ sub pprint() {
 		}
 	}
 	if(defined($eas[0]{"LEGACY-AdminID"})){
-		if(!$opt_C){
-		    print "Legacy Admin: " . $eas[0]{"LEGACY-AdminID"} . "\n";
-		}
+	    print "Legacy Admin: " . $eas[0]{"LEGACY-AdminID"} . "\n";
 		if ($string ne ""){
 		   $string = $string."," .$eas[0]{"LEGACY-AdminID"};
 	        }else{
@@ -162,9 +148,7 @@ sub pprint() {
 	}
 
 	if(defined($eas[0]{"LEGACY-ContactID"})){
-		if(!$opt_C){
-		    print "Legacy Contact: " . $eas[0]{"LEGACY-ContactID"} . "\n";
-	        }
+	    print "Legacy Contact: " . $eas[0]{"LEGACY-ContactID"} . "\n";
 		if ($string ne ""){
 		   $string = $string."," .$eas[0]{"LEGACY-ContactID"};
 	        }else{
@@ -173,9 +157,7 @@ sub pprint() {
 	}
 
 	if(defined($eas[0]{"LEGACY-User"})){
-		if(!$opt_C){ 
-		    print "Legacy User: " . $eas[0]{"LEGACY-User"} . "\n";
-		}
+	    print "Legacy User: " . $eas[0]{"LEGACY-User"} . "\n";
 		if ($string ne ""){
 		   $string = $string."," .$eas[0]{"LEGACY-User"};
 	        }else{
@@ -184,12 +166,7 @@ sub pprint() {
 	}
 	if ($string ne ""){
 	         my @str = split(",", $string);
-	         if($opt_C){
-	               print csvoutput(@str)."\n";
-	         }
-        }else{   
-                 print "\n";	
-        }
+	         print "\n";
 }elsif (!$opt_c && !$opt_b && !$opt_t){
 # This routine is complicated somewhat by the fact that at least a few EAs can have multiple values
 	my $tmpstr = "";
@@ -272,12 +249,7 @@ sub pprint() {
 	      }
 	      if ($string ne ""){
 	         my @str = split(",", $string);
-	         if($opt_C){
-	               print qq("$searchIP","$searchName",);
-	               print csvoutput(@str)."\n";
-	         }else{
 	      	       print printele(@str)."\n";
-	         }
 	     }else{
 	     	print "\n";
 	     }	
@@ -285,57 +257,52 @@ sub pprint() {
  }elsif($opt_b || $opt_t){
   	my $tmpstr = "";
   	my $string;
-  	my $btc;
+	my $btc;
 	my @eas = ($_[0]->extensible_attributes());
 	if ($eas[0]){	
-	      while(my ($key, $value) = each($eas[0])){
-	           if ($opt_b && !$opt_t){
-	    	       $string = "Business Contact";}
-	           elsif($opt_t && !$opt_b){
-	    	       $string = "Technical Contact";
-	           }	 
-	    # Special case for the Business and Technical Contact fields, which we know may have multi-values
-	           if($key eq $string && $string ne ""){
-			if($debug > 1){
-				print "Found a $key\n";
-			}
-			if(ref($value) eq 'ARRAY'){
-			 	foreach my $contact (@$value) {
-			 		if($debug > 1){
-			 			print "Contact for $key was $contact\n";
-			 		}
-			 		if($tmpstr) {
-			 			$tmpstr = $tmpstr . "," . $contact;
-			 		}else{
-		 			      $tmpstr = $contact;
+		while(my ($key, $value) = each($eas[0])){
+			if ($opt_b && !$opt_t){
+				$string = "Business Contact";}
+			elsif($opt_t && !$opt_b){
+				$string = "Technical Contact";
+			} 
+	    	# Special case for the Business and Technical Contact fields, which we know may have multi-values
+			if($key eq $string && $string ne ""){
+				if($debug > 1){
+					print "Found a $key\n";
+				}
+				if(ref($value) eq 'ARRAY'){
+			 		foreach my $contact (@$value) {
+			 			if($debug > 1){
+			 				print "Contact for $key was $contact\n";
+			 			}
+			 			if($tmpstr) {
+			 				$tmpstr = $tmpstr . "," . $contact;
+			 			} else {
+							$tmpstr = $contact;
 		 		        }
-			 	}				
-			} else {
-				$tmpstr = $value;
+				 	}				
+				} else {
+					$tmpstr = $value;
+				}
+				if ($tmpstr ne ""){
+					my @st = split(",", $tmpstr);
+					print printele(@st)."\n";
+				}	
 			}
-			#print "$tmpstr\n";
-                        if ($tmpstr ne ""){
-	                    my @st = split(",", $tmpstr);
-	                    if($opt_C){
-	                        print csvoutput(@st)."\n";
-	                    }else{
-	      	                print printele(@st)."\n";
-	                    }
-	                }	
-	     }
-	   }
+		}
 	}
-	if($tmpstr eq "" && $opt_C){
-	   	print "\n";
-	 }
   }	   
+}
 }
 
 if($#ARGV == 0){
 	$toSearch = $ARGV[0];
 } else {
-	die "Address, network, or hostname required with -i argument\n" unless ($toSearch = $opt_i);
+	die "Address, network, or hostname required\n" unless ($toSearch = $opt_i);
 }
+
+my $uqdomain = "." . $config{uqdomain};
 
 # Verify that the remote is responding. This may not be strictly necessary.
 my $timeout = 10;
@@ -352,7 +319,7 @@ eval {
 	}
 };
 
-if ($@) {
+if($@){
 	if($debug > 0){
 		print "Dumping something:\n" . Dumper($@) . "Dumped something\n";
 	}
@@ -426,18 +393,14 @@ if($debug > 1) {
 	print "Code: " . $ibsession->status_code() . ":" . $ibsession->status_detail() . "\n\n";
 }
 
-if(!$opt_C && !$opt_b && !$opt_t){
-print $searchIP.",".$searchName."\n";
+if(!$opt_b && !$opt_t){
+	print qq|$searchIP $searchName\n|;
 }
-elsif($opt_C){
-print qq("$searchIP","$searchName",);
-}
-
 if (@result_array) {
 	for my $res (@result_array) {
 		&pprint($res);
 	}
-}elsif(!@result_array && $opt_C){
+} elsif(!@result_array) {
 	print "\n";
 }
 
@@ -447,3 +410,5 @@ BEGIN {
         verify_mode => Net::SSLeay->VERIFY_NONE(),
     );
 }
+
+
