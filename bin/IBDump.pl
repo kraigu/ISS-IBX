@@ -217,6 +217,16 @@ if (@result_array) {
 	}
 } else { return 1; }
 
+if($opt_m){
+	@result_array = $ibsession->get(
+		object => "Infoblox::DHCP::FixedAddr",
+		ipv4addr => $searchIP
+	) || undef;
+	if(@result_array){
+		print "MAC address: " . $result_array[0]{"mac"} . "\n";
+	}
+}
+
 # OK, so, yeah, we hate security and stuff.
 BEGIN {
     IO::Socket::SSL::set_defaults(
