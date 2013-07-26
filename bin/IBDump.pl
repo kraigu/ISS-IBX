@@ -92,6 +92,7 @@ sub pprint {
 		return 0;
 	}
 	# OK, we're going to print it all.
+	print qq|$searchIP $searchName\n|;
 	if (defined($eas[0]{"Pol8 Classification"} ) ){
 		print qq|Classification: $eas[0]{"Pol8 Classification"}\n|;
 	}
@@ -210,16 +211,11 @@ if($debug > 1) {
 	print "Code: " . $ibsession->status_code() . ":" . $ibsession->status_detail() . "\n\n";
 }
 
-if(!$opt_b && !$opt_t){
-	print qq|$searchIP $searchName\n|;
-}
 if (@result_array) {
 	for my $res (@result_array) {
 		&pprint($res);
 	}
-} elsif(!@result_array) {
-	print "\n";
-}
+} else { return 1; }
 
 # OK, so, yeah, we hate security and stuff.
 BEGIN {
