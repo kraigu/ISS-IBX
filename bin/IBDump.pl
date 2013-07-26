@@ -19,23 +19,27 @@ use Net::IPv4Addr qw( :all ); # EXPORTS NOTHING BY DEFAULT
 use Net::IPv6Addr; # WHY DOES THIS MODULE EXPORT NOTHING AT ALL ARHGAHRGHAGR
 use Net::DNS; # HOW IRONICAL
 use ISSIBX;
-use vars qw/$opt_i $opt_v $opt_h $opt_c $opt_b $opt_t $opt_f $opt_m/;
+use vars qw/$opt_i $opt_v $opt_h $opt_b $opt_t $opt_f $opt_m/;
 use Getopt::Std;
 
-getopts('i:v:f:chbtm');
-if($opt_h){
-    print qq|
+my $helpmsg = qq|
 Options:
 -i (required, or if one argument this is assumed) IP address, network, or hostname
 -f config file
--c print all contacts
--b print only business contacts
--t print only technical contacts
--m look up MAC address too
+-b print only business contacts (conflicts with m or t)
+-t print only technical contacts (conflicts with m or b)
+-m look up MAC address too (conflicts with b or t)
 -v Verbose/debug
+Lacking either of -b or -t, will print all extensible attributes for a given host.
+With -m, will print any DHCP reservation information that's available for the host.
 |;
+
+getopts('i:v:f:chbtm');
+if( ($opt_h) || ( ($opt_m) && ($opt_b || $opt_t) ) ){
+	print $helpmsg;
     exit 0;
 }
+
 my $debug = $opt_v || 0;
 
 my $toSearch;
@@ -49,241 +53,64 @@ if($opt_f){
 	%config = ISSIBX::GetConfig();
 }
 
-sub printele {
-#check if an array has duplicated elements
-	my %seen = ();
-	my @a = ();
-	foreach my $a (@_) {
-		unless ($seen{$a}) {
-			push @a, $a;
-			$seen{$a} = 1;
-		}
-	}
-	@a= join( ',', @a );
-	my $s = join('',@a);
-	return $s;
-}
-
 sub buildcontact {
-# should take two arguments, a string and an array thingie
-	my ($ctype,$tbtc) = @_;
+	my $tmpstr = "";
 	if($debug > 0) {
-		print "buildcontact type $ctype called with a btc\n";
+		print "buildcontact argument was " . Dumper(@_);
 	}
+	if (ref($_[0]) eq 'ARRAY'){
+ 		foreach my $contact (@{$_[0]}){
+ 			if($tmpstr) {
+ 				$tmpstr = $tmpstr . "," . $contact;
+ 			} else {
+ 				$tmpstr = $contact;
+ 			}
+		}
+	} else {
+		$tmpstr = $_[0];
+	}
+	return $tmpstr;
 }
 
 sub pprint {
-	my $string ="";
-	my $tmpstr = "";
+	my ($string,$busi,$tech,$tmpstr) ="";
 	my @eas;
-	my $btc;
+	my $btc = undef;
 	@eas = ($_[0]->extensible_attributes());
-	if($opt_c){
- 		if (defined($eas[0]{"Pol8 Classification"} ) ){
-			print qq|Classification: $eas[0]{"Pol8 Classification"}\n|;
-		}
-		# Business and Technical Contact can have multiple values
-		if(defined($eas[0]{"Business Contact"})) {
-			$btc = $eas[0]{"Business Contact"};
-			&buildcontact('Business Contact',$btc);
-		 	if (ref($btc) eq 'ARRAY') {
-		 		foreach my $contact (@$btc) {
-		 			if($tmpstr) {
-		 				$tmpstr = $tmpstr . "," . $contact;
-		 			} else {
-		 				$tmpstr = $contact;
-		 			}
-				}
-				print "Business Contact: $tmpstr\n";
-			    if ($string ne ""){
-					$string = $string ."," .$tmpstr;
-				} else {
-					$string = $tmpstr;
-				}
-			} else {
-				print "Business Contact: $btc\n";
-				if ($string ne ""){
-					$string = $string ."," .$btc;
-				} else {
-					$string = $btc;
-				}
-			}
-		}
-	$btc = undef;
-	if(defined($eas[0]{"Technical Contact"})) {
-		$btc = $eas[0]{"Technical Contact"};
-		if($debug > 0){
-			print "Calling buildcontact('Technical Contact',btc) here\n";
-		}
-		 if (ref($btc) eq 'ARRAY') {
-		 	foreach my $contact (@$btc) {
-				if($tmpstr) {
-					$tmpstr = $tmpstr . "," . $contact;
-		 		} else {
-		 			$tmpstr = $contact;
-		 		}
-			}		
-		         print "Technical Contact: $tmpstr\n";
-			     if ($string ne ""){
-			           $string = $string ."," .$tmpstr
-			     }  else {
-			           $string = $tmpstr;
-			     }  
-		} else {     
-		         print "Technical Contact: $btc\n";
-			     if ($string ne ""){
-		                 $string = $string ."," .$btc;
-	                     }  else {
-		                 $string = $btc;
-	                     }
-		}
-	}
-	if(defined($eas[0]{"LEGACY-AdminID"})){
-	    print "Legacy Admin: " . $eas[0]{"LEGACY-AdminID"} . "\n";
-		if ($string ne ""){
-		   $string = $string."," .$eas[0]{"LEGACY-AdminID"};
-	        }else{
-	           $string = $eas[0]{"LEGACY-AdminID"};
-	        }
-	}
-
-	if(defined($eas[0]{"LEGACY-ContactID"})){
-	    print "Legacy Contact: " . $eas[0]{"LEGACY-ContactID"} . "\n";
-		if ($string ne ""){
-		   $string = $string."," .$eas[0]{"LEGACY-ContactID"};
-	        }else{
-	           $string = $eas[0]{"LEGACY-ContactID"};
-	        }
-	}
-
-	if(defined($eas[0]{"LEGACY-User"})){
-	    print "Legacy User: " . $eas[0]{"LEGACY-User"} . "\n";
-		if ($string ne ""){
-		   $string = $string."," .$eas[0]{"LEGACY-User"};
-	        }else{
-	           $string = $eas[0]{"LEGACY-User"};
-	        }
-	}
-	if ($string ne ""){
-	         my @str = split(",", $string);
-	         print "\n";
-}elsif (!$opt_c && !$opt_b && !$opt_t){
-# This routine is complicated somewhat by the fact that at least a few EAs can have multiple values
 	if($debug > 0){
 		print "----\nAll extensible attributes:\n";
 		print Dumper($eas[0]);
 		print "\n-----End of extensible attributes\n";
+	}	
+	# First check to see if we're only printing a limited amount of information.
+	if($opt_b){
+		print &buildcontact($eas[0]{"Business Contact"}) . "\n";
+		return 0;
 	}
-	# $eas[0] should be a hash, innit? So howcome I can't sort the keys? Just dump them out as they came in, for now.
-	if ($eas[0]){
-	 while(my ($key, $value) = each($eas[0])){
-		# Special case for the Business and Technical Contact fields, which we know may have multi-values
-		if($key eq "Business Contact" || $key eq "Technical Contact"){
-			if($debug > 1){
-				print "Found a $key\n";
-			}
-			if(ref($value) eq 'ARRAY'){
-			 	foreach my $contact (@$value) {
-			 		if($debug > 1){
-			 			print "Contact for $key was $contact\n";
-			 		}
-			 		if($tmpstr) {
-			 			$tmpstr = $tmpstr . "," . $contact;
-			 		}else{
-		 			      $tmpstr = $contact;
-		 		        }
-			 	}				
-			} else {
-				$tmpstr = $value;
-			}
-			print "$key: $tmpstr\n";
-		}
-		# Derps if anything not handled above is also an array reference...
-		else {
-			print "$key: $value\n";
-		}
+	if($opt_t){
+		print &buildcontact($eas[0]{"Technical Contact"}) . "\n";
+		return 0;
 	}
-     }
- }elsif($opt_b && $opt_t){
-	if ($eas[0]){
-	   	 if(defined($eas[0]{"Business Contact"})) {
-		      $btc = $eas[0]{"Business Contact"};
-		      &buildcontact('Business Contact',$btc);
-		      if (ref($btc) eq 'ARRAY') {
-		 	foreach my $contact (@$btc) {
-		 		if($tmpstr) {
-		 			$tmpstr = $tmpstr . "," . $contact;
-		 		} else {
-		 			$tmpstr = $contact;
-		 		}
-			}
-			  $string = $tmpstr;
-		   } else {
-			  $string = $btc;
-		  }
-	        }
-	        $btc = undef;
-	        if(defined($eas[0]{"Technical Contact"})) {
-		    $btc = $eas[0]{"Technical Contact"};
-		    if($debug > 0){
-			print "Calling buildcontact('Technical Contact',btc) here\n";
-		    }
-		    if (ref($btc) eq 'ARRAY') {
-		 	foreach my $contact (@$btc) {
-		 		if($tmpstr) {
-		 			$tmpstr = $tmpstr . "," . $contact;
-		 		} else {
-		 			$tmpstr = $contact;
-		 		}
-			}
-			$string = $string.",".$tmpstr;
-		    } else {
-			$string = $string.",".$btc;
-		    }
-	      }
-	      if ($string ne ""){
-	         my @str = split(",", $string);
-	      	       print printele(@str)."\n";
-	     }else{
-	     	print "\n";
-	     }	
-	   }	
- }elsif($opt_b || $opt_t){
-	if ($eas[0]){	
-		while(my ($key, $value) = each($eas[0])){
-			if ($opt_b && !$opt_t){
-				$string = "Business Contact";}
-			elsif($opt_t && !$opt_b){
-				$string = "Technical Contact";
-			} 
-	    	# Special case for the Business and Technical Contact fields, which we know may have multi-values
-			if($key eq $string && $string ne ""){
-				if($debug > 1){
-					print "Found a $key\n";
-				}
-				if(ref($value) eq 'ARRAY'){
-			 		foreach my $contact (@$value) {
-			 			if($debug > 1){
-			 				print "Contact for $key was $contact\n";
-			 			}
-			 			if($tmpstr) {
-			 				$tmpstr = $tmpstr . "," . $contact;
-			 			} else {
-							$tmpstr = $contact;
-		 		        }
-				 	}				
-				} else {
-					$tmpstr = $value;
-				}
-				if ($tmpstr ne ""){
-					my @st = split(",", $tmpstr);
-					print printele(@st)."\n";
-				}	
-			}
-		}
+	# OK, we're going to print it all.
+	if (defined($eas[0]{"Pol8 Classification"} ) ){
+		print qq|Classification: $eas[0]{"Pol8 Classification"}\n|;
 	}
-  }	   
-}
+	# Business and Technical Contact can have multiple values
+	if(defined($eas[0]{"Business Contact"})) {
+		print "Business Contact: " . &buildcontact($eas[0]{"Business Contact"}) . "\n";
+	}
+	if(defined($eas[0]{"Technical Contact"})) {
+		print "Technical Contact: " . &buildcontact($eas[0]{"Technical Contact"}) . "\n";
+	}
+	if(defined($eas[0]{"LEGACY-AdminID"})){
+	    print "Legacy Admin: " . $eas[0]{"LEGACY-AdminID"} . "\n";
+	}
+	if(defined($eas[0]{"LEGACY-ContactID"})){
+	    print "Legacy Contact: " . $eas[0]{"LEGACY-ContactID"} . "\n";
+	}
+	if(defined($eas[0]{"LEGACY-User"})){
+	    print "Legacy User: " . $eas[0]{"LEGACY-User"} . "\n";
+	}
 }
 
 if($#ARGV == 0){
