@@ -215,7 +215,7 @@ if (@result_array) {
 	for my $res (@result_array) {
 		&pprint($res);
 	}
-} else { return 1; }
+} else { exit 1; }
 
 if($opt_m){
 	@result_array = $ibsession->get(
@@ -224,7 +224,7 @@ if($opt_m){
 	) || undef;
 	if(@result_array){
 		print "MAC address: " . $result_array[0]{"mac"} . "\n";
-	}
+	} 
 }
 
 # OK, so, yeah, we hate security and stuff.
