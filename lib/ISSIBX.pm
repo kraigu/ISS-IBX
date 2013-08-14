@@ -27,10 +27,10 @@ sub GetConfig{
 	my %config = $conf->getall;
 	if($debug > 3){ print "Config is: \n" . Dumper(\%config) . "\n"; }
 
-	die "\nNo password!\n" unless $config{password};
-	die "\nNo hostname!\n" unless $config{hostname};
-	die "\nNo username!\n" unless $config{username};
-	die "\nNo unqualified domain!\n" unless $config{uqdomain};
+	die "\nNo password in $configfile, set password=\n" unless $config{password};
+	die "\nNo hostname in $configfile, set hostname=\n" unless $config{hostname};
+	die "\nNo username in $configfile, set username=\n" unless $config{username};
+	die "\nNo unqualified domain in $configfile, set uqdomain=\n" unless $config{uqdomain};
 	return %config;
 }
 
