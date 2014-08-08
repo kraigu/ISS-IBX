@@ -96,6 +96,9 @@ sub pprint {
 	if (defined($eas[0]{"Pol8 Classification"} ) ){
 		print qq|Classification: $eas[0]{"Pol8 Classification"}\n|;
 	}
+	if (defined($eas[0]{"Compliance Type"} ) ){
+		print qq|Compliance Type: $eas[0]{"Compliance Type"}\n|;
+	}
 	# Business and Technical Contact can have multiple values
 	if(defined($eas[0]{"Business Contact"})) {
 		print "Business Contact: " . &buildcontact($eas[0]{"Business Contact"}) . "\n";
