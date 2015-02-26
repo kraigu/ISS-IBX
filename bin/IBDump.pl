@@ -179,6 +179,7 @@ if ( my $ip = ipv4_chkip($toSearch) ){
 		foreach my $rr ($query->answer) {
 			next unless $rr->type eq "PTR";
 			$searchName = $rr->ptrdname;
+			print "Found $searchName\n";
 		}
 	} else {
 		die "$searchIP does not have a PTR record\n";
