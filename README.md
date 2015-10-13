@@ -1,6 +1,8 @@
 ISS-IBX
 =======
 
+*** This project is considered both obsolete and incomplete.
+
 Waterloo ISS tools to talk to an Infoblox appliance.
 
 IBDump.pl gets all the extensible attributes for a given host and has options to dump just particular ones.
